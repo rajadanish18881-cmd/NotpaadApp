@@ -1,0 +1,278 @@
+<meta name='viewport' content='width=device-width, initial-scale=1'/><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notepad App</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#007bff">
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    /* Splash Screen */
+    #splash {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(135deg, #007bff, #00c6ff);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      font-size: 24px;
+      z-index: 9999;
+      animation: fadeOut 1s ease forwards;
+      animation-delay: 3s;
+    }
+
+    #splash h1 {
+      font-size: 40px;
+      margin: 0;
+      opacity: 0;
+      animation: fadeInUp 1s forwards;
+    }
+    #splash p {
+      margin: 10px 0 0;
+      font-size: 20px;
+      opacity: 0;
+      animation: fadeInUp 1.5s forwards;
+      animation-delay: 0.5s;
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeOut { to { opacity: 0; visibility: hidden; } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    #app { display: none; padding: 20px; text-align: center; }
+    #app.show { display: block; animation: fadeIn 1s ease; }
+
+    textarea {
+      width: 90%; height: 300px;
+      font-size: 16px; padding: 10px;
+      border: 2px solid #444; border-radius: 8px;
+      outline: none; resize: none;
+      background: #fff; color: #000;
+      transition: background 0.3s, color 0.3s;
+    }
+    button {
+      margin: 5px; padding: 8px 15px;
+      border: none; border-radius: 6px;
+      background: #007bff; color: white;
+      cursor: pointer; transition: background 0.3s;
+    }
+    button:hover { background: #0056b3; }
+    select, input { margin: 5px; padding: 5px; font-size: 14px; }
+    .info { margin-top: 8px; font-size: 14px; font-weight: bold; }
+    body.dark { background: #121212; color: #f4f4f4; }
+    body.dark textarea { background: #1e1e1e; color: #f4f4f4; border: 2px solid #888; }
+  </style>
+</head>
+<body>
+  <!-- Splash -->
+  <div id="splash">
+    <h1>Notepad</h1>
+    <p>Save anything here</p>
+  </div>
+
+  <!-- App -->
+  <div id="app">
+    <h2>📝 Notepad</h2>
+    <div>
+      <input type="text" id="searchBox" placeholder="🔍 Search notes..." oninput="filterNotes()">
+      <select id="noteList"></select>
+      <button onclick="newNote()">➕ New</button>
+      <button onclick="deleteNote()">🗑 Delete</button>
+      <button onclick="togglePin()">📌 Pin/Unpin</button>
+    </div>
+
+    <textarea id="noteArea" placeholder="Start typing..."></textarea>
+
+    <div>
+      <button onclick="downloadNote()">⬇ Download</button>
+      <button onclick="backupNotes()">💾 Backup All</button>
+      <button onclick="restoreNotes()">📂 Import</button>
+      <button onclick="toggleDarkMode()">🌙/☀️ Mode</button>
+      <input type="file" id="importFile" style="display:none" accept=".json">
+    </div>
+
+    <div class="info" id="counter">Words: 0 | Characters: 0</div>
+    <div class="info" id="timestamp">Last saved: Never</div>
+  </div>
+
+  <script>
+    const splash = document.getElementById("splash");
+    const app = document.getElementById("app");
+    const noteArea = document.getElementById("noteArea");
+    const noteList = document.getElementById("noteList");
+    const searchBox = document.getElementById("searchBox");
+    const counter = document.getElementById("counter");
+    const timestamp = document.getElementById("timestamp");
+    const importFile = document.getElementById("importFile");
+
+    let currentNote = null;
+
+    // Splash → show app
+    setTimeout(() => {
+      splash.style.display = "none";
+      app.classList.add("show");
+      loadNotesList();
+      if (noteList.options.length > 0) {
+        currentNote = noteList.value;
+        loadNote(currentNote);
+      }
+    }, 4000);
+
+    // Auto-save
+    noteArea.addEventListener("input", () => {
+      if (currentNote) {
+        const now = new Date().toLocaleString();
+        localStorage.setItem("note_" + currentNote, noteArea.value);
+        localStorage.setItem("time_" + currentNote, now);
+        timestamp.textContent = "Last saved: " + now;
+        updateCounter();
+      }
+    });
+
+    function newNote() {
+      const name = prompt("Enter note name:");
+      if (name && !localStorage.getItem("note_" + name)) {
+        localStorage.setItem("note_" + name, "");
+        localStorage.setItem("time_" + name, new Date().toLocaleString());
+        localStorage.setItem("pin_" + name, "false");
+        loadNotesList();
+        noteList.value = name;
+        currentNote = name;
+        loadNote(name);
+      } else {
+        alert("Note name already exists or invalid!");
+      }
+    }
+
+    function deleteNote() {
+      if (currentNote && confirm("Delete this note?")) {
+        localStorage.removeItem("note_" + currentNote);
+        localStorage.removeItem("time_" + currentNote);
+        localStorage.removeItem("pin_" + currentNote);
+        loadNotesList();
+        if (noteList.options.length > 0) {
+          currentNote = noteList.value;
+          loadNote(currentNote);
+        } else {
+          noteArea.value = "";
+          counter.textContent = "Words: 0 | Characters: 0";
+          timestamp.textContent = "Last saved: Never";
+          currentNote = null;
+        }
+      }
+    }
+
+    function loadNotesList() {
+      noteList.innerHTML = "";
+      let notes = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key.startsWith("note_")) {
+          const name = key.replace("note_", "");
+          const pinned = localStorage.getItem("pin_" + name) === "true";
+          notes.push({ name, pinned });
+        }
+      }
+      notes.sort((a, b) => b.pinned - a.pinned || a.name.localeCompare(b.name));
+      notes.forEach(n => {
+        const option = document.createElement("option");
+        option.value = n.name;
+        option.textContent = n.pinned ? "📌 " + n.name : n.name;
+        noteList.appendChild(option);
+      });
+    }
+
+    function loadNote(name) {
+      noteArea.value = localStorage.getItem("note_" + name) || "";
+      const savedTime = localStorage.getItem("time_" + name);
+      timestamp.textContent = savedTime ? "Last saved: " + savedTime : "Last saved: Never";
+      updateCounter();
+    }
+
+    noteList.addEventListener("change", () => {
+      currentNote = noteList.value;
+      loadNote(currentNote);
+    });
+
+    function downloadNote() {
+      if (!currentNote) return alert("No note selected!");
+      const text = noteArea.value;
+      const blob = new Blob([text], { type: "text/plain" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = currentNote + ".txt";
+      link.click();
+    }
+
+    function toggleDarkMode() { document.body.classList.toggle("dark"); }
+    function updateCounter() {
+      const text = noteArea.value.trim();
+      const words = text ? text.split(/\s+/).length : 0;
+      const chars = noteArea.value.length;
+      counter.textContent = `Words: ${words} | Characters: ${chars}`;
+    }
+    function filterNotes() {
+      const search = searchBox.value.toLowerCase();
+      for (let option of noteList.options) {
+        option.style.display = option.value.toLowerCase().includes(search) ? "block" : "none";
+      }
+    }
+    function togglePin() {
+      if (!currentNote) return alert("No note selected!");
+      const pinned = localStorage.getItem("pin_" + currentNote) === "true";
+      localStorage.setItem("pin_" + currentNote, !pinned);
+      loadNotesList();
+      noteList.value = currentNote;
+    }
+    function backupNotes() {
+      let data = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key.startsWith("note_") || key.startsWith("time_") || key.startsWith("pin_")) {
+          data[key] = localStorage.getItem(key);
+        }
+      }
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "notes_backup.json";
+      link.click();
+    }
+    function restoreNotes() { importFile.click(); }
+    importFile.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        try {
+          const data = JSON.parse(event.target.result);
+          for (let key in data) localStorage.setItem(key, data[key]);
+          loadNotesList();
+          alert("✅ Notes restored successfully!");
+        } catch (err) { alert("❌ Invalid backup file!"); }
+      };
+      reader.readAsText(file);
+    });
+
+    // Register service worker
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("service-worker.js")
+        .then(() => console.log("✅ Service Worker Registered"))
+        .catch(err => console.error("❌ SW Error", err));
+    }
+  </script>
+</body>
+</html>
