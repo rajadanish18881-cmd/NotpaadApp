@@ -1,0 +1,12 @@
+{
+  "background_color": "#a571c2",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "Notepad",
+  "orientation": "any",
+  "scope": "/",
+  "short_name": "Notepad",
+  "start_url": "/https://rajadanish18881-cmd.github.io/NotpaadApp/",
+  "theme_color": "#696792",
+  "id": "DK creator"
+}
